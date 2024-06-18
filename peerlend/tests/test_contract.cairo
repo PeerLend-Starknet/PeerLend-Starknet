@@ -13,9 +13,9 @@ use peerlend::protocol::IPeerlendDispatcher;
 use peerlend::protocol::IPeerlendDispatcherTrait;
 
 fn deploy_contract(name: ByteArray) -> ContractAddress {
-    let owner = contract_address_const < 'beef' > ();
+    let owner: ContractAddress = 0xbeef.try_into().unwrap();
     let contract = declare(name).unwrap();
-    let calldata: Array<felt252> = array![owner];
+    let calldata: Array<felt252> = array![owner.into()];
     let (contract_address, _) = contract.deploy(@calldata).unwrap();
     contract_address
 }
@@ -24,10 +24,26 @@ fn deploy_contract(name: ByteArray) -> ContractAddress {
 fn test_deployment() {
     let contract_address = deploy_contract("Peerlend");
 
-    let dispatcher = IOwnableDispatcher { contract_address: contract_address };
+    let dispatcher = IPeerlendDispatcher { contract_address: contract_address };
 
-    let owner: ContractAddress = dispatcher.owner();
-    assert(owner != Zero::zero(), 'Invalid owner');
+    let owner: ContractAddress = dispatcher.get_owner();
+    assert(owner == 0xbeef.try_into().unwrap(), 'Invalid owner');
+}
+
+#[test]
+fn test_get_user_details() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address: contract_address };
+
+    let user_address = 0xdeadbeef.try_into().unwrap();
+    let user_details = dispatcher.get_user_details(user_address);
+
+    assert(user_details.address == Zero::zero(), 'Invalid borrower');
+    assert(user_details.total_amount_borrowed == 0, 'Invalid lender');
+    assert(user_details.total_amount_repaid == 0, 'Invalid amount repaid');
+    assert(user_details.total_amount_lended == 0, 'Invalid amount lended');
+    assert(user_details.current_loan == 0, 'Invalid lender balance');
 }
 // #[test]
 // #[feature("safe_dispatcher")]
