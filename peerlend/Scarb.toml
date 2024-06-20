@@ -8,6 +8,8 @@ edition = "2023_11"
 [dependencies]
 starknet = "2.6.3"
 openzeppelin = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v0.13.0" }
+pragma_lib = { git = "https://github.com/astraly-labs/pragma-lib" }
+alexandria_math = { git = "https://github.com/keep-starknet-strange/alexandria.git" }
 
 [dev-dependencies]
 snforge_std = { git = "https://github.com/foundry-rs/starknet-foundry", tag = "v0.24.0" }
@@ -17,3 +19,10 @@ sierra = true
 
 [scripts]
 test = "snforge test"
+echo = "echo $STARKNET_RPC_URL"
+
+[[tool.snforge.fork]]
+url = "https://starknet-mainnet.public.blastapi.io"
+name = "mainnet"
+block_id.number = "650899"
+# block_id.tag = "Latest"
