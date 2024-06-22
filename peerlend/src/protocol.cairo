@@ -43,6 +43,7 @@ pub trait IPeerlend<TContractState> {
         return_date: u64
     );
     fn respond_to_offer(ref self: TContractState, request_id: u64, offer_id: u16, accept: bool);
+    fn repay_loan(ref self: TContractState, request_id: u64, amount: u256);
 }
 
 #[starknet::contract]
@@ -296,7 +297,7 @@ pub mod Peerlend {
 
             let request_id = self.total_request_ids.read();
 
-            let total_repayment = self._calculate_repayment(amount, interest_rate);
+            let total_repayment = self._calculate_repayment(loan_amount_usd_scale, interest_rate);
 
             let request = Request {
                 request_id: request_id,
@@ -335,12 +336,17 @@ pub mod Peerlend {
             let loan_amount_usd_scale = self
                 ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
 
+            let total_repayment = self
+                ._calculate_repayment(loan_amount_usd_scale, request.interest_rate);
+
             // update request status and lender
             self
                 .requests
                 .write(
                     request_id,
-                    Request { status: RequestStatus::SERVICED, lender: caller, ..request }
+                    Request {
+                        total_repayment, status: RequestStatus::SERVICED, lender: caller, ..request
+                    }
                 );
 
             // update borrower current loan and total amount borrowed
@@ -349,9 +355,9 @@ pub mod Peerlend {
                 .write(
                     request.borrower,
                     UserInfo {
-                        current_loan: borrower_info.current_loan + loan_amount_usd_scale,
+                        current_loan: borrower_info.current_loan + total_repayment,
                         total_amount_borrowed: borrower_info.total_amount_borrowed
-                            + loan_amount_usd_scale,
+                            + total_repayment,
                         ..borrower_info
                     },
                 );
@@ -433,7 +439,8 @@ pub mod Peerlend {
                 let loan_amount_usd_scale = self
                     ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
 
-                let total_repayment = self._calculate_repayment(offer.amount, offer.interest_rate);
+                let total_repayment = self
+                    ._calculate_repayment(loan_amount_usd_scale, offer.interest_rate);
 
                 // update request status and lender
                 self
@@ -456,7 +463,7 @@ pub mod Peerlend {
                     .write(
                         request.borrower,
                         UserInfo {
-                            current_loan: borrower_info.current_loan + loan_amount_usd_scale,
+                            current_loan: borrower_info.current_loan + total_repayment,
                             total_amount_borrowed: borrower_info.total_amount_borrowed
                                 + loan_amount_usd_scale,
                             ..borrower_info
@@ -492,6 +499,59 @@ pub mod Peerlend {
                     );
             }
         }
+
+        fn repay_loan(ref self: ContractState, request_id: u64, amount: u256) {
+            assert(request_id < self.total_request_ids.read(), errors::REQUEST_ID_NOT_FOUND);
+            let request = self.get_request_by_id(request_id);
+            let caller = get_caller_address();
+            assert(request.borrower == caller, errors::NOT_REQUEST_OWNER);
+            assert(request.status == RequestStatus::SERVICED, errors::REQUEST_NOT_SERVICED);
+
+            let caller_info = self.get_user_details(caller);
+            let (loan_amount_usd, decimals) = self.get_token_price_usd(request.loan_token, amount);
+            let loan_amount_usd_scale = self
+                ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
+
+            if request.total_repayment < loan_amount_usd_scale {
+                self
+                    .requests
+                    .write(
+                        request_id,
+                        Request { total_repayment: 0, status: RequestStatus::CLOSED, ..request }
+                    );
+            } else {
+                let new_total_repayment = request.total_repayment - loan_amount_usd_scale;
+                self
+                    .requests
+                    .write(request_id, Request { total_repayment: new_total_repayment, ..request });
+            }
+
+            let mut new_current_loan = caller_info.current_loan;
+
+            if caller_info.current_loan < loan_amount_usd_scale {
+                new_current_loan = 0;
+            } else {
+                new_current_loan -= loan_amount_usd_scale;
+            }
+
+            self
+                .user_info
+                .write(
+                    caller,
+                    UserInfo {
+                        current_loan: new_current_loan,
+                        total_amount_repaid: (caller_info.total_amount_repaid
+                            + loan_amount_usd_scale),
+                        ..caller_info
+                    }
+                );
+        // assert(
+        //     ERC20ABIDispatcher { contract_address: request.loan_token }
+        //         .transfer_from(caller, request.lender, amount),
+        //     errors::TRANSFER_FAILED
+        // );
+        }
+
 
         fn set_loanable_tokens(
             ref self: ContractState, tokens: Array<ContractAddress>, asset_id: Array<felt252>
