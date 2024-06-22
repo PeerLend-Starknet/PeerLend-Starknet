@@ -17,7 +17,7 @@ use peerlend::protocol::{
     IPeerlendSafeDispatcher, IPeerlendSafeDispatcherTrait, IPeerlendDispatcher,
     IPeerlendDispatcherTrait
 };
-use peerlend::types::{UserInfo, Request, RequestStatus, OfferStatus};
+use peerlend::types::{UserInfo, Request, Offer, RequestStatus, OfferStatus};
 
 use openzeppelin::token::erc20::interface::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
 
@@ -253,10 +253,6 @@ fn test_create_request() {
 
     cheat_caller_address_global(user_address);
 
-    let collateral = dispatcher.get_total_collateral_deposited_usd(user_address);
-
-    println!("Collateral: {}", collateral);
-
     dispatcher.create_request(usd_amount, 3, return_date, usd);
 
     let request = dispatcher.get_request_by_id(0);
@@ -303,6 +299,86 @@ fn test_service_request() {
     assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
     assert(borrower_details.total_amount_borrowed == 199907400000, 'Wrong total amount borrowed');
     assert(borrower_details.current_loan == 199907400000, 'Wrong current loan');
+}
+
+#[test]
+#[fork("mainnet")]
+fn test_make_offer() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    // let borrower = contract_address_const::<eth_strk_holder>();
+    let lender = contract_address_const::<usdt_holder>();
+    let usd_amount: u256 = 2000 * fast_power(10, 6);
+
+    create_request(dispatcher, eth_strk_holder, 2000, usdt_address);
+
+    cheat_caller_address_global(lender);
+
+    // should approve the contract to spend the usdt before making offer
+    // ERC20ABIDispatcher { contract_address: usdt }.approve(contract_address, usd_amount);
+
+    dispatcher.make_offer(0, usd_amount, 5, (60 * 60 * 24 * 30));
+    dispatcher.make_offer(0, usd_amount, 2, (60 * 60 * 24 * 30));
+    dispatcher.make_offer(0, usd_amount, 7, (60 * 60 * 24 * 30));
+    dispatcher.make_offer(0, usd_amount, 10, (60 * 60 * 24 * 30));
+
+    let offers: Array<Offer> = dispatcher.get_offers_for_request(0);
+
+    assert(offers.len() == 4, 'Wrong number of offers');
+    assert(*offers.at(0).status == OfferStatus::PENDING, 'Wrong offer status');
+    assert(*offers.at(0).lender == lender, 'Wrong lender');
+    assert(*offers.at(0).interest_rate == 5_u16, 'Wrong interest rate');
+    assert(*offers.at(1).interest_rate == 2_u16, 'Wrong interest rate');
+    assert(*offers.at(2).interest_rate == 7_u16, 'Wrong interest rate');
+    assert(*offers.at(3).interest_rate == 10_u16, 'Wrong interest rate');
+}
+
+#[test]
+#[fork("mainnet")]
+fn test_respond_to_offer() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let lender = contract_address_const::<usdt_holder>();
+    let borrower = contract_address_const::<eth_strk_holder>();
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    create_request(dispatcher, eth_strk_holder, 2000, usdt_address);
+
+    make_offer(dispatcher, 0, 5);
+    make_offer(dispatcher, 0, 2);
+    make_offer(dispatcher, 0, 7);
+    make_offer(dispatcher, 0, 10);
+
+    prank_caller_address(dispatcher.contract_address, borrower, 5);
+
+    dispatcher.respond_to_offer(0, 0, false);
+    let offers_before = dispatcher.get_offers_for_request(0);
+
+    assert(*offers_before.at(0).status == OfferStatus::REJECTED, 'Wrong offer status');
+    assert(*offers_before.at(1).status == OfferStatus::PENDING, 'Wrong offer status');
+
+    dispatcher.respond_to_offer(0, 3, true);
+
+    let offers_after = dispatcher.get_offers_for_request(0);
+
+    assert(*offers_after.at(1).status == OfferStatus::REJECTED, 'Wrong offer status');
+    assert(*offers_after.at(2).status == OfferStatus::REJECTED, 'Wrong offer status');
+    assert(*offers_after.at(3).status == OfferStatus::ACCEPTED, 'Wrong offer status');
+
+    let request = dispatcher.get_request_by_id(0);
+
+    let borrower_details = dispatcher.get_user_details(borrower);
+    let lender_details = dispatcher.get_user_details(lender);
+
+    assert(request.lender == lender, 'Wrong lender');
+    assert(request.interest_rate == 10, 'Wrong interest rate');
+    assert(borrower_details.current_loan == 199907400000, 'Wrong current loan');
+    assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
 }
 
 // #[test]
@@ -380,6 +456,41 @@ fn deposit_collateral(
     token_dispatcher.approve(dispatcher.contract_address, token_amount);
 
     dispatcher.deposit_collateral(token_address, token_amount);
+
+    stop_cheat_caller_address_global();
+}
+
+fn create_request(dispatcher: IPeerlendDispatcher, user: felt252, amount: u256, token: felt252) {
+    let borrower: ContractAddress = user.try_into().unwrap();
+    // let eth = contract_address_const::<eth_address>();
+    let usd = contract_address_const::<usdt_address>();
+
+    let eth_amount: u256 = 1;
+
+    let usd_amount: u256 = amount * fast_power(10, 6);
+    let return_date = get_block_timestamp() + (60 * 60 * 24 * 30);
+
+    deposit_collateral(dispatcher, user, eth_address, eth_amount, 18);
+
+    prank_caller_address(dispatcher.contract_address, borrower, 1);
+
+    dispatcher.create_request(usd_amount, 3, return_date, usd);
+}
+
+fn make_offer(dispatcher: IPeerlendDispatcher, request_id: u64, interest_rate: u16) {
+    let usdt = contract_address_const::<usdt_address>();
+    let lender = contract_address_const::<usdt_holder>();
+    let usd_amount: u256 = 2000 * fast_power(10, 6);
+
+    // create_request(dispatcher, eth_strk_holder, 2000, usdt_address);
+
+    cheat_caller_address_global(lender);
+
+    // should approve the contract to spend the usdt before making offer
+    let token_dispatcher = ERC20ABIDispatcher { contract_address: usdt };
+    token_dispatcher.approve(dispatcher.contract_address, usd_amount);
+
+    dispatcher.make_offer(request_id, usd_amount, interest_rate, (60 * 60 * 24 * 30));
 
     stop_cheat_caller_address_global();
 }
