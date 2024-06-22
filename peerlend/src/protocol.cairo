@@ -42,9 +42,7 @@ pub trait IPeerlend<TContractState> {
         interest_rate: u16,
         return_date: u64
     );
-//     fn respond_to_offer(
-//         ref self: TContractState, request_id: u64, offer_id: u16, accept: bool
-//     );
+    fn respond_to_offer(ref self: TContractState, request_id: u64, offer_id: u16, accept: bool);
 }
 
 #[starknet::contract]
@@ -259,7 +257,8 @@ pub mod Peerlend {
 
             // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
             // assert(
-            //     erc20_dispatcher.transfer_from(caller, this_address, amount),
+            //     ERC20ABIDispatcher { contract_address: token }
+            //         .transfer_from(caller, get_contract_address(), amount),
             //     errors::TRANSFER_FAILED
             // );
             self.emit(CollateralDeposited { user: caller, token, amount });
@@ -373,7 +372,8 @@ pub mod Peerlend {
             // TODO: fix the erc20 transfer_from call
             // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: request.loan_token };
             // assert(
-            //     erc20_dispatcher.transfer_from(caller, request.borrower, request.amount),
+            //     ERC20ABIDispatcher { contract_address: request.loan_token }
+            //         .transfer_from(caller, request.borrower, request.amount),
             //     errors::TRANSFER_FAILED
             // );
 
@@ -402,7 +402,6 @@ pub mod Peerlend {
                 interest_rate,
                 return_date,
                 status: OfferStatus::PENDING,
-                token_address: request.loan_token,
             };
 
             self.offers.write((request_id, offer_id), offer);
@@ -411,9 +410,88 @@ pub mod Peerlend {
 
             self.emit(OfferCreated { request_id, offer_id, lender: caller, amount, interest_rate });
         }
-        // fn respond_to_offer(
-        //     ref self: ContractState, request_id: u64, offer_id: u16, accept: bool
-        // );
+
+        fn respond_to_offer(ref self: ContractState, request_id: u64, offer_id: u16, accept: bool) {
+            let caller = get_caller_address();
+            let request = self.get_request_by_id(request_id);
+            assert(request.borrower == caller, errors::NOT_REQUEST_OWNER);
+            assert(request.status == RequestStatus::OPEN, errors::REQUEST_ALREADY_SERVICED);
+
+            let last_offer = self.last_offer_id.read(request_id);
+            assert(offer_id < last_offer, errors::OFFER_ID_NOT_FOUND);
+
+            let offer = self.offers.read((request_id, offer_id));
+
+            assert(offer.status == OfferStatus::PENDING, errors::OFFER_NOT_PENDING);
+
+            if accept {
+                let borrower_info = self.get_user_details(request.borrower);
+                let lender_info = self.get_user_details(offer.lender);
+
+                let (loan_amount_usd, decimals) = self
+                    .get_token_price_usd(request.loan_token, offer.amount);
+                let loan_amount_usd_scale = self
+                    ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
+
+                let total_repayment = self._calculate_repayment(offer.amount, offer.interest_rate);
+
+                // update request status and lender
+                self
+                    .requests
+                    .write(
+                        request_id,
+                        Request {
+                            total_repayment,
+                            status: RequestStatus::SERVICED,
+                            amount: offer.amount,
+                            lender: offer.lender,
+                            interest_rate: offer.interest_rate,
+                            ..request
+                        }
+                    );
+
+                // update borrower current loan and total amount borrowed
+                self
+                    .user_info
+                    .write(
+                        request.borrower,
+                        UserInfo {
+                            current_loan: borrower_info.current_loan + loan_amount_usd_scale,
+                            total_amount_borrowed: borrower_info.total_amount_borrowed
+                                + loan_amount_usd_scale,
+                            ..borrower_info
+                        },
+                    );
+
+                // update lender total amount lent
+                self
+                    .user_info
+                    .write(
+                        offer.lender,
+                        UserInfo {
+                            total_amount_lended: lender_info.total_amount_lended
+                                + loan_amount_usd_scale,
+                            ..lender_info
+                        },
+                    );
+
+                // make other offers rejected
+                self._resolve_offers(request_id, offer_id);
+
+                // transfer the loan amount to the borrower
+                assert(
+                    ERC20ABIDispatcher { contract_address: request.loan_token }
+                        .transfer_from(offer.lender, request.borrower, offer.amount),
+                    errors::TRANSFER_FAILED
+                );
+            } else {
+                self
+                    .offers
+                    .write(
+                        (request_id, offer_id), Offer { status: OfferStatus::REJECTED, ..offer }
+                    );
+            }
+        }
 
         fn set_loanable_tokens(
             ref self: ContractState, tokens: Array<ContractAddress>, asset_id: Array<felt252>
@@ -463,6 +541,29 @@ pub mod Peerlend {
         fn _calculate_repayment(self: @ContractState, amount: u256, interest_rate: u16) -> u256 {
             let interest = amount * interest_rate.into() / 100;
             amount + interest
+        }
+
+        fn _resolve_offers(ref self: ContractState, request_id: u64, offer_id: u16) {
+            let mut index: u16 = 0;
+            let last_offer_id = self.last_offer_id.read(request_id);
+
+            while index < last_offer_id {
+                let offer = self.offers.read((request_id, index));
+                if index != offer_id {
+                    self
+                        .offers
+                        .write(
+                            (request_id, index), Offer { status: OfferStatus::REJECTED, ..offer },
+                        );
+                } else {
+                    self
+                        .offers
+                        .write(
+                            (request_id, index), Offer { status: OfferStatus::ACCEPTED, ..offer },
+                        );
+                }
+                index += 1;
+            };
         }
     }
 
