@@ -13,10 +13,11 @@ use core::num::traits::Zero;
 use openzeppelin::access::ownable::interface::IOwnable;
 use openzeppelin::access::ownable::interface::IOwnableDispatcher;
 
-use peerlend::protocol::IPeerlendSafeDispatcher;
-use peerlend::protocol::IPeerlendSafeDispatcherTrait;
-use peerlend::protocol::IPeerlendDispatcher;
-use peerlend::protocol::IPeerlendDispatcherTrait;
+use peerlend::protocol::{
+    IPeerlendSafeDispatcher, IPeerlendSafeDispatcherTrait, IPeerlendDispatcher,
+    IPeerlendDispatcherTrait
+};
+use peerlend::types::{UserInfo, Request, RequestStatus, OfferStatus};
 
 use openzeppelin::token::erc20::interface::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
 
@@ -261,6 +262,47 @@ fn test_create_request() {
     let request = dispatcher.get_request_by_id(0);
 
     assert(request.amount == usd_amount, 'Wrong request price');
+}
+
+#[test]
+#[fork("mainnet")]
+fn test_service_request() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    let borrower = contract_address_const::<eth_strk_holder>();
+    let lender = contract_address_const::<usdt_holder>();
+
+    let usdt = contract_address_const::<usdt_address>();
+
+    let eth_amount: u256 = 1;
+
+    let usd_amount: u256 = 2000 * fast_power(10, 6);
+    let return_date = get_block_timestamp() + (60 * 60 * 24 * 30);
+
+    deposit_collateral(dispatcher, eth_strk_holder, eth_address, eth_amount, 18);
+    cheat_caller_address_global(borrower);
+
+    dispatcher.create_request(usd_amount, 3, return_date, usdt);
+
+    cheat_caller_address_global(lender);
+
+    ERC20ABIDispatcher { contract_address: usdt }.approve(contract_address, usd_amount);
+    dispatcher.service_request(0);
+
+    let request = dispatcher.get_request_by_id(0);
+
+    assert(request.status == RequestStatus::SERVICED, 'Wrong request status');
+    assert(request.lender == lender, 'Wrong lender');
+
+    let lender_details = dispatcher.get_user_details(lender);
+    let borrower_details = dispatcher.get_user_details(borrower);
+
+    assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
+    assert(borrower_details.total_amount_borrowed == 199907400000, 'Wrong total amount borrowed');
+    assert(borrower_details.current_loan == 199907400000, 'Wrong current loan');
 }
 
 // #[test]

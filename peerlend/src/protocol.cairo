@@ -307,19 +307,60 @@ pub mod Peerlend {
         fn service_request(ref self: ContractState, request_id: u64) {
             let request = self.get_request_by_id(request_id);
             assert(request.status == RequestStatus::OPEN, errors::REQUEST_ALREADY_SERVICED);
+
             let caller = get_caller_address();
+            assert(request.borrower != caller, errors::CANNOT_SERVICE_OWN_REQUEST);
+
             let caller_info = self.get_user_details(caller);
-            // assert(caller_info.is_lender, errors::NOT_LENDER);
             let borrower_info = self.get_user_details(request.borrower);
+
             let (loan_amount_usd, decimals) = self
                 .get_token_price_usd(request.loan_token, request.amount);
             let loan_amount_usd_scale = self
                 ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
-            let tcv = loan_amount_usd_scale + borrower_info.current_loan;
-            let _health_factor = self._health_factor(request.borrower, tcv);
-            assert(_health_factor >= 1, errors::INSUFFICIENT_COLLATERAL);
 
-            self.requests.write(request_id, Request { status: RequestStatus::SERVICED, ..request });
+            // update request status and lender
+            self
+                .requests
+                .write(
+                    request_id,
+                    Request { status: RequestStatus::SERVICED, lender: caller, ..request }
+                );
+
+            // update borrower current loan and total amount borrowed
+            self
+                .user_info
+                .write(
+                    request.borrower,
+                    UserInfo {
+                        current_loan: borrower_info.current_loan + loan_amount_usd_scale,
+                        total_amount_borrowed: borrower_info.total_amount_borrowed
+                            + loan_amount_usd_scale,
+                        ..borrower_info
+                    },
+                );
+
+            // update lender total amount lent
+            self
+                .user_info
+                .write(
+                    caller,
+                    UserInfo {
+                        total_amount_lended: caller_info.total_amount_lended
+                            + loan_amount_usd_scale,
+                        ..caller_info
+                    },
+                );
+
+            // transfer the loan amount to the borrower
+            // TODO: fix the erc20 transfer_from call
+            // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: request.loan_token };
+            // assert(
+            //     erc20_dispatcher.transfer_from(caller, request.borrower, request.amount),
+            //     errors::TRANSFER_FAILED
+            // );
+
+            self.emit(RequestServiced { request_id, lender: caller, amount: request.amount });
         }
 
         // fn make_offer(
