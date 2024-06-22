@@ -16,7 +16,6 @@ const Header = () => {
     <div className='flex items-center justify-between'>
         <a href='#about' className='mr-12'>About Us</a>
         <a href='#contact'className='mr-12'>Contact</a>
-        <NavLink to=''>Blog</NavLink>
     </div>
     <ConnectWallet />
    </div>
@@ -26,7 +25,6 @@ const Header = () => {
 <Hamburger toggled={isOpen} toggle={setOpen} />
    {isOpen && (
         <div className='flex flex-col absolute bg-[#2a2a2a] w-[90%] text-center top-full mt-2 z-50 px-6 py-10'>
-            <NavLink to='#about' className='mb-8'>About Us</NavLink>
             <a href='#about' className='mb-8'>About Us</a>
         <a href='#contact'className='mb-8'>Contact</a>
         <ConnectWallet />

@@ -4,6 +4,7 @@ import { RiCompassDiscoverFill } from "react-icons/ri";
 import { PieChart } from '@mui/x-charts/PieChart';
 import RecentData from '../../components/RecentData';
 import ConnectWallet from '../../components/ConnectWallet';
+import { NavLink } from 'react-router-dom';
 
 const Dashboard = () => {
   return (
@@ -27,7 +28,7 @@ const Dashboard = () => {
         <div className='flex lg:flex-row md:flex-row flex-col justify-between w-[100%'>
         <p className='font-[400] mb-4 lg:w-[75%] md:w-[75%] w-[100%] '>If you&apos;re looking to lend, explore the request page to find lending opportunities</p>
         <div className='w-[15%] text-4xl'>
-        <button><RiCompassDiscoverFill className='text-[#E0BB83] text-[40px] hover:bg-[#2a2a2a] hover:text-[white]'/></button>
+        <NavLink to='explore'><RiCompassDiscoverFill className='text-[#E0BB83] text-[40px] hover:bg-[#2a2a2a] hover:text-[white]'/></NavLink>
         </div>
         </div>
         </div>
