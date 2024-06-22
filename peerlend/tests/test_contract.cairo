@@ -19,7 +19,9 @@ use peerlend::protocol::{
 };
 use peerlend::types::{UserInfo, Request, Offer, RequestStatus, OfferStatus};
 
-use openzeppelin::token::erc20::interface::{ERC20ABIDispatcher, ERC20ABIDispatcherTrait};
+use openzeppelin::token::erc20::interface::{
+    ERC20ABIDispatcher, ERC20ABIDispatcherTrait, ERC20ABISafeDispatcher, ERC20ABISafeDispatcherTrait
+};
 
 use alexandria_math::fast_power::fast_power;
 
@@ -297,8 +299,8 @@ fn test_service_request() {
     let borrower_details = dispatcher.get_user_details(borrower);
 
     assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
-    assert(borrower_details.total_amount_borrowed == 199907400000, 'Wrong total amount borrowed');
-    assert(borrower_details.current_loan == 199907400000, 'Wrong current loan');
+    assert(borrower_details.total_amount_borrowed == 205904622000, 'Wrong total amount borrowed');
+    assert(borrower_details.current_loan == 205904622000, 'Wrong current loan');
 }
 
 #[test]
@@ -375,10 +377,64 @@ fn test_respond_to_offer() {
     let borrower_details = dispatcher.get_user_details(borrower);
     let lender_details = dispatcher.get_user_details(lender);
 
+    // println!("Borrower: {}", borrower_details.current_loan);
+
     assert(request.lender == lender, 'Wrong lender');
     assert(request.interest_rate == 10, 'Wrong interest rate');
-    assert(borrower_details.current_loan == 199907400000, 'Wrong current loan');
+    assert(borrower_details.current_loan == 219898140000, 'Wrong current loan');
     assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
+}
+
+#[test]
+#[fork("mainnet")]
+#[feature("safe_dispatcher")]
+fn test_repay_loan() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    let borrower = contract_address_const::<eth_strk_holder>();
+    let lender = contract_address_const::<usdt_holder>();
+
+    let usdt = contract_address_const::<usdt_address>();
+
+    // let eth_amount: u256 = 1;
+    let usd_amount: u256 = 2000 * fast_power(10, 6);
+
+    // deposit_collateral(dispatcher, eth_strk_holder, eth_address, eth_amount, 18);
+    // cheat_caller_address_global(borrower);
+
+    create_request(dispatcher, eth_strk_holder, 2000, usdt_address);
+
+    cheat_caller_address_global(lender);
+
+    ERC20ABIDispatcher { contract_address: usdt }.approve(contract_address, usd_amount);
+    dispatcher.service_request(0);
+
+    stop_cheat_caller_address_global();
+
+    cheat_caller_address_global(borrower);
+
+    let usd_part_payment: u256 = 1500 * fast_power(10, 6);
+    let usd_full_payment: u256 = 600 * fast_power(10, 6);
+
+    dispatcher.repay_loan(0, usd_part_payment);
+
+    dispatcher.repay_loan(0, usd_full_payment);
+
+    let request = dispatcher.get_request_by_id(0);
+
+    // println!("request: {}", request.total_repayment);
+
+    assert(request.status == RequestStatus::CLOSED, 'Wrong request status');
+
+    let lender_details = dispatcher.get_user_details(lender);
+    let borrower_details = dispatcher.get_user_details(borrower);
+    // println!("lender_details: {}", borrower_details.total_amount_repaid);
+    assert(lender_details.total_amount_lended == 199907400000, 'Wrong total amount lended');
+    assert(borrower_details.total_amount_borrowed == 205904622000, 'Wrong total amount borrowed');
+    assert(borrower_details.current_loan == 0, 'Wrong current loan');
 }
 
 // #[test]
