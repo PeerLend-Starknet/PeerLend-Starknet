@@ -7,6 +7,11 @@ import {
 } from "react-router-dom";
 import Home from "./pages/Home";
 import HomeLayout from "./layout/HomeLayout";
+import DashboardLayout from "./layout/DashboardLayout";
+import Dashboard from "./pages/Dashboard/Dashboard";
+import Portfolio from "./pages/Dashboard/Portfolio";
+import Explore from "./pages/Dashboard/Explore";
+import ExploreDetails from "./pages/Dashboard/ExploreDetails";
 
 
 const router = createBrowserRouter(createRoutesFromElements(
@@ -14,7 +19,12 @@ const router = createBrowserRouter(createRoutesFromElements(
   <Route path="/" element={<HomeLayout />} >
     <Route index element={<Home />} />
   </Route>
- 
+  <Route path="/dashboard" element={<DashboardLayout />}>
+      <Route index element={<Dashboard />} />
+      <Route path="portfolio" element={<Portfolio />} />
+      <Route path="explore" element={<Explore />} />
+      <Route path="explore/:id" element={<ExploreDetails />} />
+    </Route>
   </Route>
 ))
 

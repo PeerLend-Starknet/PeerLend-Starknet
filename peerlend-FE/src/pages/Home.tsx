@@ -113,7 +113,7 @@ const Home = () => {
             </div>
         </div>
     </section>
-    <section className='lg:w-[85%] md:w-[85%] w-[100%] mx-auto justify-between flex lg:flex-row md:flex-row flex-col py-6 px-6 lg:px-0 md:px-0'>
+    <section className='lg:w-[85%] md:w-[85%] w-[100%] mx-auto justify-between flex lg:flex-row md:flex-row flex-col py-6 px-6 lg:px-0 md:px-0' id='about'>
     <div className='lg:w-[50%] md:w-[50%] w-[100%] lg:order-1 md:order-1 order-2'>
     <img src={phone} alt="" className='lg:w-[90%] mx-auto' />
     </div>
@@ -184,14 +184,15 @@ const Home = () => {
     <section className='my-12 bg-gradient-to-r from-[#E0BB83]/10 via-[#2a2a2a] to-[#2a2a2a] py-20 b' >
     <div style={{ backgroundImage: `url(${worldBg})` }} className='lg:bg-right-0  md:bg-right-0 bg-no-repeat bg-contain bg-bottom-0'>
     <div className='lg:w-[85%] md:w-[85%] w-[100%] mx-auto'>
-    <h2 className="lg:text-[46px] md:text-[46px] text-[28px] font-bold font-playfair mb-4 w-[100%] lg:w-[50%] md:w-[50%]">Join the growing community of users who trust PeerLend, the new and innovative<span className='text-[#E0BB83]'> P2P lending platform</span></h2>
+        <h2 className="lg:text-[46px] md:text-[46px] text-[28px] font-bold font-playfair mb-4 w-[100%] lg:w-[50%] md:w-[50%]">Join our <span className='text-[#E0BB83]'>Community</span></h2>
+    <p className="lg:text-[20px] md:text-[20px] text-[16px] mb-4 w-[100%] lg:w-[50%] md:w-[50%]">Join the growing community of users who trust PeerLend, the new and innovative P2P lending platform</p>
     <div className='lg:w-[40%] md:w-[40%] w-[80%] mx-auto lg:mx-0 md:mx-0'>
         <ReviewSlider />
     </div>
     </div>
     </div>
   </section>
-  <section className='lg:w-[85%] md:w-[85%] w-[90%] mx-auto flex lg:flex-row md:flex-row flex-col justify-between my-16'>
+  <section className='lg:w-[85%] md:w-[85%] w-[90%] mx-auto flex lg:flex-row md:flex-row flex-col justify-between my-16' id='contact'>
     <div className='text-[16px]lg:w-[40%] md:w-[40%] w-[100%] mb-6'>
     <h2 className="lg:text-[46px] md:text-[46px] text-[28px] font-bold font-playfair">Still have a <span className='text-[#E0BB83]'>question</span>?</h2>
     <p className='mb-4 lg:text-[18px] md:text-[18px] text-[14px] uppercase font-[400]'>Send us a Message</p>
