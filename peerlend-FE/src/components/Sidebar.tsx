@@ -1,6 +1,6 @@
 import React from "react";
 import { MdDashboard } from "react-icons/md";
-import { IoDocumentText, IoLogOut } from "react-icons/io5";
+import { IoLogOut } from "react-icons/io5";
 import { NavLink } from "react-router-dom";
 import { RiCompassDiscoverFill } from "react-icons/ri";
 import { useDisconnect } from "@starknet-react/core"
@@ -45,13 +45,6 @@ const Sidebar: React.FC = () => {
       >
         <RiCompassDiscoverFill className="mr-2" /> Explore
       </NavLink>
-      <NavLink
-        to="terms"
-        className="flex items-center py-4 px-8 my-4"
-        style={({ isActive }) => (isActive ? activeStyle : undefined)}
-      >
-        <IoDocumentText className="mr-2" /> Terms & Condition
-      </NavLink>
       <div className="mt-36">
         <button className="flex items-center py-4 px-8" onClick={() => disconnect()}>
           <IoLogOut className="mr-2" /> Log Out
@@ -81,13 +74,6 @@ const Sidebar: React.FC = () => {
         style={({ isActive }) => (isActive ? activeStyle : undefined)}
       >
         <RiCompassDiscoverFill className="mr-2 text-xl" />
-      </NavLink>
-      <NavLink
-        to="terms"
-        className="py-4 px-2 my-4"
-        style={({ isActive }) => (isActive ? activeStyle : undefined)}
-      >
-        <IoDocumentText className="mr-2 text-xl" />
       </NavLink>
       <div className="mt-auto">
         <button className="py-4 px-8 my-4" onClick={() => disconnect()}>
