@@ -18,6 +18,7 @@ pub trait IPeerlend<TContractState> {
     fn get_total_collateral_deposited_usd(self: @TContractState, user: ContractAddress) -> u256;
     fn get_request_by_id(self: @TContractState, request_id: u64) -> Request;
     fn get_all_requests(self: @TContractState) -> Array<Request>;
+    fn get_offers_for_request(self: @TContractState, request_id: u64) -> Array<Offer>;
     fn health_factor(self: @TContractState, user: ContractAddress, borrow_value: u256) -> u256;
 
     //write functions
@@ -34,13 +35,13 @@ pub trait IPeerlend<TContractState> {
         loan_token: ContractAddress
     );
     fn service_request(ref self: TContractState, request_id: u64);
-//     fn make_offer(
-//         ref self: TContractState,
-//         request_id: u64,
-//         amount: u256,
-//         interest_rate: u16,
-//         return_date: u64
-//     );
+    fn make_offer(
+        ref self: TContractState,
+        request_id: u64,
+        amount: u256,
+        interest_rate: u16,
+        return_date: u64
+    );
 //     fn respond_to_offer(
 //         ref self: TContractState, request_id: u64, offer_id: u16, accept: bool
 //     );
@@ -226,6 +227,22 @@ pub mod Peerlend {
             requests
         }
 
+        fn get_offers_for_request(self: @ContractState, request_id: u64) -> Array<Offer> {
+            let mut offers: Array<Offer> = ArrayTrait::new();
+            let mut index: u16 = 0;
+
+            while index < self
+                .last_offer_id
+                .read(request_id) {
+                    let offer = self.offers.read((request_id, index));
+                    offers.append(offer);
+                    index += 1;
+                };
+
+            offers
+        }
+
+
         fn health_factor(self: @ContractState, user: ContractAddress, borrow_value: u256) -> u256 {
             Private::_health_factor(self, user, borrow_value)
         }
@@ -363,13 +380,37 @@ pub mod Peerlend {
             self.emit(RequestServiced { request_id, lender: caller, amount: request.amount });
         }
 
-        // fn make_offer(
-        //     ref self: ContractState,
-        //     request_id: u64,
-        //     amount: u256,
-        //     interest_rate: u16,
-        //     return_date: u64
-        // );
+        fn make_offer(
+            ref self: ContractState,
+            request_id: u64,
+            amount: u256,
+            interest_rate: u16,
+            return_date: u64
+        ) {
+            let request = self.get_request_by_id(request_id);
+            assert(request.status == RequestStatus::OPEN, errors::REQUEST_ALREADY_SERVICED);
+
+            let caller = get_caller_address();
+            assert(request.borrower != caller, errors::OWN_REQUEST);
+
+            let offer_id = self.last_offer_id.read(request_id);
+
+            let offer = Offer {
+                offer_id,
+                lender: caller,
+                amount,
+                interest_rate,
+                return_date,
+                status: OfferStatus::PENDING,
+                token_address: request.loan_token,
+            };
+
+            self.offers.write((request_id, offer_id), offer);
+
+            self.last_offer_id.write(request_id, offer_id + 1);
+
+            self.emit(OfferCreated { request_id, offer_id, lender: caller, amount, interest_rate });
+        }
         // fn respond_to_offer(
         //     ref self: ContractState, request_id: u64, offer_id: u16, accept: bool
         // );

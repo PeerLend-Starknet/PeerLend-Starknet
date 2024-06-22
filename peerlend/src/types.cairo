@@ -28,7 +28,7 @@ pub struct Offer {
     pub lender: ContractAddress,
     pub amount: u256,
     pub interest_rate: u16,
-    pub return_date: u16,
+    pub return_date: u64,
     pub status: OfferStatus,
     pub token_address: ContractAddress,
 }
@@ -42,7 +42,7 @@ pub enum RequestStatus {
 
 #[derive(Copy, Drop, Serde, PartialEq, starknet::Store)]
 pub enum OfferStatus {
-    OPEN,
+    PENDING,
     ACCEPTED,
     REJECTED,
 }
