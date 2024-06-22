@@ -1,6 +1,7 @@
 import React from 'react';
 
-const ExploreDetails = () => {
+
+const PortfolioDetails = () => {
     // const { id } = useParams();
 
     return (
@@ -47,4 +48,4 @@ const ExploreDetails = () => {
     );
 }
 
-export default ExploreDetails;
+export default PortfolioDetails;

@@ -2,7 +2,7 @@ import React from "react";
 import { MdDashboard } from "react-icons/md";
 import { IoDocumentText, IoLogOut } from "react-icons/io5";
 import { NavLink } from "react-router-dom";
-import { RiGovernmentFill } from "react-icons/ri";
+import { RiCompassDiscoverFill } from "react-icons/ri";
 import { useDisconnect } from "@starknet-react/core"
 import { TbTransactionBitcoin } from "react-icons/tb";
 import logo from '../assets/logo.svg'
@@ -19,9 +19,9 @@ const Sidebar: React.FC = () => {
   };
 
   return (
-    <div className="w-[20%] h-[85vh] border-r border-[#E0BB83]/20">
+    <div className="w-[20%] h-[100vh] border-r border-[#E0BB83]/20">
         <div className="w-[100%] hidden py-8 lg:flex md:flex flex-col">
-        <p className='text-[18px] flex items-center'><img src={logo} alt="" className='w-[40px] h-[40px] '/>
+        <p className='text-[18px] flex items-center mt-4 mb-14 ml-4'><img src={logo} alt="" className='w-[40px] h-[40px] '/>
         PeerLend</p>
       <NavLink
         to="/dashboard"
@@ -43,7 +43,7 @@ const Sidebar: React.FC = () => {
         className="flex items-center py-4 px-8 my-4"
         style={({ isActive }) => (isActive ? activeStyle : undefined)}
       >
-        <RiGovernmentFill className="mr-2" /> Explore
+        <RiCompassDiscoverFill className="mr-2" /> Explore
       </NavLink>
       <NavLink
         to="terms"
@@ -58,8 +58,8 @@ const Sidebar: React.FC = () => {
         </button>
       </div>
       </div>
-      <div className="lg:hidden md:hidden h-[80vh] py-8 flex flex-col items-center border-r border-[#E0BB83]/20">
-      <img src={logo} alt="" className='w-[40px] h-[40px] '/>
+      <div className="lg:hidden md:hidden h-[100vh] py-8 flex flex-col items-center border-r border-[#E0BB83]/20">
+      <img src={logo} alt="" className='w-[40px] h-[40px] mb-12'/>
       <NavLink
         to="/dashboard"
         end
@@ -80,7 +80,7 @@ const Sidebar: React.FC = () => {
         className="py-4 px-2 my-4"
         style={({ isActive }) => (isActive ? activeStyle : undefined)}
       >
-        <RiGovernmentFill className="mr-2 text-xl" />
+        <RiCompassDiscoverFill className="mr-2 text-xl" />
       </NavLink>
       <NavLink
         to="terms"

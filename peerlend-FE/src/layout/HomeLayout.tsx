@@ -5,9 +5,9 @@ import { Outlet, Navigate } from "react-router-dom"
 import { useAccount } from "@starknet-react/core"
 
 const HomeLayout = () => {
+  const { status } = useAccount();
 
-  const { isConnected } = useAccount();
-  return isConnected ? <Navigate to={'/dashboard'}/> : (
+    return status === "connected" ? <Navigate to={'/dashboard'}/> : (
     <div>
         <Header />
         <Outlet />

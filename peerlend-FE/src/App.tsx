@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard/Dashboard";
 import Portfolio from "./pages/Dashboard/Portfolio";
 import Explore from "./pages/Dashboard/Explore";
 import ExploreDetails from "./pages/Dashboard/ExploreDetails";
+import PortfolioDetails from './pages/Dashboard/PortfolioDetails'
 
 
 const router = createBrowserRouter(createRoutesFromElements(
@@ -22,6 +23,7 @@ const router = createBrowserRouter(createRoutesFromElements(
   <Route path="/dashboard" element={<DashboardLayout />}>
       <Route index element={<Dashboard />} />
       <Route path="portfolio" element={<Portfolio />} />
+      <Route path="portfolio/:id" element={<PortfolioDetails />} />
       <Route path="explore" element={<Explore />} />
       <Route path="explore/:id" element={<ExploreDetails />} />
     </Route>

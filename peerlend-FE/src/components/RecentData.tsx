@@ -20,7 +20,7 @@ const rows = [
 const RecentData =  () => {
   return (
     <TableContainer component={Paper}>
-      <Table sx={{ minWidth: 650 }} aria-label="simple table">
+      <Table sx={{ minWidth: 650, backgroundColor: '#e0bb83b9' }} aria-label="simple table">
         <TableHead>
           <TableRow>
             <TableCell>Transaction Type</TableCell>
