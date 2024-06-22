@@ -15,8 +15,10 @@ pub trait IPeerlend<TContractState> {
     fn get_token_price_usd(
         self: @TContractState, token: ContractAddress, amount: u256
     ) -> (u256, u32);
-
     fn get_total_collateral_deposited_usd(self: @TContractState, user: ContractAddress) -> u256;
+    fn get_request_by_id(self: @TContractState, request_id: u64) -> Request;
+    fn get_all_requests(self: @TContractState) -> Array<Request>;
+    fn health_factor(self: @TContractState, user: ContractAddress, borrow_value: u256) -> u256;
 
     //write functions
     fn set_loanable_tokens(
@@ -24,11 +26,28 @@ pub trait IPeerlend<TContractState> {
     );
     fn deposit_collateral(ref self: TContractState, token: ContractAddress, amount: u256);
     fn withdraw_collateral(ref self: TContractState, token: ContractAddress, amount: u256);
+    fn create_request(
+        ref self: TContractState,
+        amount: u256,
+        interest_rate: u16,
+        return_date: u64,
+        loan_token: ContractAddress
+    );
+    fn service_request(ref self: TContractState, request_id: u64);
+//     fn make_offer(
+//         ref self: TContractState,
+//         request_id: u64,
+//         amount: u256,
+//         interest_rate: u16,
+//         return_date: u64
+//     );
+//     fn respond_to_offer(
+//         ref self: TContractState, request_id: u64, offer_id: u16, accept: bool
+//     );
 }
 
 #[starknet::contract]
 pub mod Peerlend {
-    // use core::traits::TryInto;
     use core::option::OptionTrait;
     use core::traits::TryInto;
     use core::traits::Into;
@@ -54,11 +73,11 @@ pub mod Peerlend {
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
 
-    const threshold: u256 = 8500; // 85% of the total collateral
+    const threshold: u16 = 8500; // 85% of the total collateral
 
     #[storage]
     struct Storage {
-        request_id: u64,
+        total_request_ids: u64,
         collateral_token_id: u16,
         last_offer_id: LegacyMap<u64, u16>,
         collateral_tokens: LegacyMap<u16, ContractAddress>,
@@ -78,15 +97,54 @@ pub mod Peerlend {
     #[derive(Drop, starknet::Event)]
     enum Event {
         CollateralDeposited: CollateralDeposited,
+        RequestCreated: RequestCreated,
+        RequestServiced: RequestServiced,
+        OfferCreated: OfferCreated,
         #[flat]
         OwnableEvent: OwnableComponent::Event,
     }
 
     #[derive(Drop, starknet::Event)]
     struct CollateralDeposited {
+        #[key]
         user: ContractAddress,
+        #[key]
         token: ContractAddress,
         amount: u256,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct RequestCreated {
+        #[key]
+        request_id: u64,
+        #[key]
+        user: ContractAddress,
+        #[key]
+        loan_token: ContractAddress,
+        amount: u256,
+        interest_rate: u16,
+        return_date: u64
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct RequestServiced {
+        #[key]
+        request_id: u64,
+        #[key]
+        lender: ContractAddress,
+        amount: u256
+    }
+
+    #[derive(Drop, starknet::Event)]
+    struct OfferCreated {
+        #[key]
+        request_id: u64,
+        #[key]
+        offer_id: u16,
+        #[key]
+        lender: ContractAddress,
+        amount: u256,
+        interest_rate: u16
     }
 
     #[abi(embed_v0)]
@@ -99,7 +157,7 @@ pub mod Peerlend {
         }
 
         fn get_user_details(self: @ContractState, user_address: ContractAddress) -> UserInfo {
-            self.user_info.read(user_address)
+            UserInfo { address: user_address, ..self.user_info.read(user_address) }
         }
 
         fn get_collateral_token_id(self: @ContractState) -> u16 {
@@ -139,7 +197,7 @@ pub mod Peerlend {
                 let token = self.collateral_tokens.read(index);
                 let amount = self.collateral_deposited.read((user, token));
                 let (price, decimals) = self.get_token_price_usd(token, amount);
-                let scaled_price = Private::scale_price(
+                let scaled_price = Private::_scale_price(
                     self, price.try_into().unwrap(), decimals, 8
                 );
                 total_collateral_usd += scaled_price;
@@ -149,6 +207,28 @@ pub mod Peerlend {
             total_collateral_usd
         }
 
+        fn get_request_by_id(self: @ContractState, request_id: u64) -> Request {
+            assert(request_id < self.total_request_ids.read(), errors::REQUEST_ID_NOT_FOUND);
+            self.requests.read(request_id)
+        }
+
+        fn get_all_requests(self: @ContractState) -> Array<Request> {
+            let mut requests: Array<Request> = ArrayTrait::new();
+            let mut index: u64 = 0;
+
+            while index < self
+                .total_request_ids
+                .read() {
+                    requests.append(self.requests.read(index));
+                    index += 1;
+                };
+
+            requests
+        }
+
+        fn health_factor(self: @ContractState, user: ContractAddress, borrow_value: u256) -> u256 {
+            Private::_health_factor(self, user, borrow_value)
+        }
 
         fn deposit_collateral(ref self: ContractState, token: ContractAddress, amount: u256) {
             assert(self._is_loanable_token(token), errors::CANNOT_COLLATERALIZE);
@@ -178,6 +258,81 @@ pub mod Peerlend {
             assert(erc20_dispatcher.transfer(caller, amount), errors::TRANSFER_FAILED);
         }
 
+        fn create_request(
+            ref self: ContractState,
+            amount: u256,
+            interest_rate: u16,
+            return_date: u64,
+            loan_token: ContractAddress
+        ) {
+            assert(self._is_loanable_token(loan_token), errors::NOT_LOANABLE_TOKEN);
+            let caller = get_caller_address();
+            let caller_info = self.get_user_details(caller);
+
+            let (loan_amount_usd, decimals) = self.get_token_price_usd(loan_token, amount);
+            let loan_amount_usd_scale = self
+                ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
+
+            // tcv -> total collateral value
+            let tcv = loan_amount_usd_scale + caller_info.current_loan;
+            let _health_factor = self._health_factor(caller, tcv);
+            assert(_health_factor >= 1, errors::INSUFFICIENT_COLLATERAL);
+
+            let request_id = self.total_request_ids.read();
+
+            let total_repayment = self._calculate_repayment(amount, interest_rate);
+
+            let request = Request {
+                request_id: request_id,
+                borrower: caller,
+                amount,
+                interest_rate,
+                total_repayment,
+                return_date,
+                loan_token,
+                status: RequestStatus::OPEN,
+                lender: Zero::zero(),
+            };
+            self.requests.write(request_id, request);
+            self.total_request_ids.write(request_id + 1);
+
+            self
+                .emit(
+                    RequestCreated {
+                        request_id, user: caller, amount, interest_rate, return_date, loan_token
+                    }
+                );
+        }
+
+        fn service_request(ref self: ContractState, request_id: u64) {
+            let request = self.get_request_by_id(request_id);
+            assert(request.status == RequestStatus::OPEN, errors::REQUEST_ALREADY_SERVICED);
+            let caller = get_caller_address();
+            let caller_info = self.get_user_details(caller);
+            // assert(caller_info.is_lender, errors::NOT_LENDER);
+            let borrower_info = self.get_user_details(request.borrower);
+            let (loan_amount_usd, decimals) = self
+                .get_token_price_usd(request.loan_token, request.amount);
+            let loan_amount_usd_scale = self
+                ._scale_price(loan_amount_usd.try_into().unwrap(), decimals, 8);
+            let tcv = loan_amount_usd_scale + borrower_info.current_loan;
+            let _health_factor = self._health_factor(request.borrower, tcv);
+            assert(_health_factor >= 1, errors::INSUFFICIENT_COLLATERAL);
+
+            self.requests.write(request_id, Request { status: RequestStatus::SERVICED, ..request });
+        }
+
+        // fn make_offer(
+        //     ref self: ContractState,
+        //     request_id: u64,
+        //     amount: u256,
+        //     interest_rate: u16,
+        //     return_date: u64
+        // );
+        // fn respond_to_offer(
+        //     ref self: ContractState, request_id: u64, offer_id: u16, accept: bool
+        // );
+
         fn set_loanable_tokens(
             ref self: ContractState, tokens: Array<ContractAddress>, asset_id: Array<felt252>
         ) {
@@ -206,7 +361,7 @@ pub mod Peerlend {
             self.loanable.read(token)
         }
 
-        fn scale_price(
+        fn _scale_price(
             self: @ContractState, price: u128, price_decimals: u32, decimals: u32
         ) -> u256 {
             if price_decimals > decimals {
@@ -215,6 +370,17 @@ pub mod Peerlend {
                 return (price * fast_power(10, decimals - price_decimals).into()).into();
             }
             price.into()
+        }
+
+        fn _health_factor(self: @ContractState, user: ContractAddress, borrow_value: u256) -> u256 {
+            let total_collateral_usd = self.get_total_collateral_deposited_usd(user);
+            let health_factor = total_collateral_usd * threshold.into() / borrow_value / 10000;
+            health_factor
+        }
+
+        fn _calculate_repayment(self: @ContractState, amount: u256, interest_rate: u16) -> u256 {
+            let interest = amount * interest_rate.into() / 100;
+            amount + interest
         }
     }
 

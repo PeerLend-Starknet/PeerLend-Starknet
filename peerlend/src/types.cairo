@@ -16,10 +16,10 @@ pub struct Request {
     pub amount: u256,
     pub interest_rate: u16,
     pub total_repayment: u256,
-    pub return_date: u16,
+    pub return_date: u64,
     pub lender: ContractAddress,
     pub status: RequestStatus,
-    pub token_address: ContractAddress,
+    pub loan_token: ContractAddress,
 }
 
 #[derive(Drop, Serde, starknet::Store)]

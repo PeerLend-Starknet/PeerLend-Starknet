@@ -1,6 +1,6 @@
 use core::traits::TryInto;
 use core::option::OptionTrait;
-use starknet::{ContractAddress, contract_address_const};
+use starknet::{ContractAddress, contract_address_const, get_block_timestamp};
 
 use snforge_std::{
     declare, ContractClassTrait, spy_events, SpyOn, EventSpy, EventAssertions, CheatSpan,
@@ -58,9 +58,10 @@ fn test_get_user_details() {
     let dispatcher = IPeerlendDispatcher { contract_address: contract_address };
 
     let user_address = 0xbeef.try_into().unwrap();
+    prank_caller_address(contract_address, user_address, 1);
     let user_details = dispatcher.get_user_details(user_address);
 
-    assert(user_details.address == Zero::zero(), 'Invalid borrower');
+    assert(user_details.address == user_address, 'Invalid user address');
     assert(user_details.total_amount_borrowed == 0, 'Invalid lender');
     assert(user_details.total_amount_repaid == 0, 'Invalid amount repaid');
     assert(user_details.total_amount_lended == 0, 'Invalid amount lended');
@@ -210,9 +211,57 @@ fn test_get_total_collateral_deposited_usd() {
     );
 }
 
-// #[test]
-// #[fork("mainnet")]
-// fn test_total_collateral_usd() {}
+#[test]
+#[fork("mainnet")]
+fn test_health_factor() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    let user_address: ContractAddress = eth_strk_holder.try_into().unwrap();
+    let eth = contract_address_const::<eth_address>();
+
+    let eth_amount: u256 = 1;
+
+    deposit_collateral(dispatcher, eth_strk_holder, eth_address, eth_amount, 18);
+
+    let (total_borrowed_usd, _) = dispatcher.get_token_price_usd(eth, 25 * fast_power(10, 16));
+
+    assert!(dispatcher.health_factor(user_address, total_borrowed_usd) == 3, "Wrong health factor");
+}
+
+#[test]
+#[fork("mainnet")]
+fn test_create_request() {
+    let contract_address = deploy_contract("Peerlend");
+
+    let dispatcher = IPeerlendDispatcher { contract_address };
+    add_loanable_tokens(dispatcher);
+
+    let user_address: ContractAddress = eth_strk_holder.try_into().unwrap();
+    // let eth = contract_address_const::<eth_address>();
+    let usd = contract_address_const::<usdt_address>();
+
+    let eth_amount: u256 = 1;
+
+    let usd_amount: u256 = 2000 * fast_power(10, 6);
+    let return_date = get_block_timestamp() + (60 * 60 * 24 * 30);
+
+    deposit_collateral(dispatcher, eth_strk_holder, eth_address, eth_amount, 18);
+
+    cheat_caller_address_global(user_address);
+
+    let collateral = dispatcher.get_total_collateral_deposited_usd(user_address);
+
+    println!("Collateral: {}", collateral);
+
+    dispatcher.create_request(usd_amount, 3, return_date, usd);
+
+    let request = dispatcher.get_request_by_id(0);
+
+    assert(request.amount == usd_amount, 'Wrong request price');
+}
 
 // #[test]
 // #[feature("safe_dispatcher")]
