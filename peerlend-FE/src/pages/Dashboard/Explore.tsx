@@ -1,9 +1,55 @@
-import React from 'react'
-import ConnectWallet from '../../components/ConnectWallet'
-import { Link } from 'react-router-dom'
+import React from 'react';
+import ConnectWallet from '../../components/ConnectWallet';
+import peerlendAbi from "../../constants/peerlendAbi.json";
+import peerlend_address from '../../constants';
+//import { useContractRead } from '@starknet-react/core';
+import { useAccount } from '@starknet-react/core';
+import { Link } from 'react-router-dom';
+import useReadContract from '../../components/useReadContract';
+import { ethers } from 'ethers';
+
+type Result = Array<{
+  request_id: bigint;
+  borrower: bigint;
+  amount: bigint;
+  interest_rate: bigint;
+  total_repayment: bigint;
+  return_date: bigint;
+}>;
 
 const Explore = () => {
+  const res = useReadContract(peerlendAbi, peerlend_address, "get_all_requests", []);
+  const { data: data, isLoading: isLoading } = res;
+  console.log(data, "data");
+  const { address } = useAccount();
+
+
+   // Parsing data to match the expected type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parseData = (data: any): Result | undefined => {
+    if (!data) return undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return data.map((item: any) => ({
+      request_id: BigInt(item.request_id),
+      borrower: BigInt(item.borrower),
+      amount: BigInt(item.amount),
+      interest_rate: BigInt(item.interest_rate),
+      total_repayment: BigInt(item.total_repayment),
+      return_date: BigInt(item.return_date)
+    }));
+  };
+
+  const portfolioRes: Result | undefined = parseData(data);
+
+
+
+
+
+
   return (
+    <div>
+
+  {address ? (
     <main>
            <div className='flex justify-between items-center mb-6'>
         <h2 className="lg:text-[24px] md:text-[24px] text-[20px] text-[#E0BB83] font-playfair font-bold mb-4 items-center">Explore</h2>
@@ -28,19 +74,28 @@ const Explore = () => {
         </section>
         <section>
       <h3 className='text-[20px] font-playfair font-[700] my-4 text-[#E0BB83]'>All Active Requests</h3>
-        <div className="flex justify-between flex-wrap">     
-            <div className="w-[100%] lg:w-[31%] md:w-[31%] rounded-lg border border-[#E0BB83]/40  p-4 mt-6">
-            <Link to={`/dashboard/explore/id`}>
-                <img src='https://z-p3-scontent.fiba1-2.fna.fbcdn.net/o1/v/t0/f1/m247/2850021285355695016_2501028907_22-06-2024-04-34-56.jpeg?_nc_ht=z-p3-scontent.fiba1-2.fna.fbcdn.net&_nc_cat=102&ccb=9-4&oh=00_AYC1Z9Nt9gCWm8sHZ_yH-6sZYlv-w5ySnuMEa1F81h25RQ&oe=66794051&_nc_sid=5b3566' alt="" className="w-[100%] rounded-lg h-[200px] object-cover object-center mb-4" />
-                <p>Amount: 100</p>
-                <p>Rate: <span>&#37;</span></p>
-                <p>Repayment: </p>
-                <p>Return date: </p>
-            </Link>
-            </div>
+        <div className="flex justify-between flex-wrap"> 
+        {isLoading ? <p>Loading...</p> : portfolioRes?.map((item, index) => (
+                    <div key={index} className="w-[100%] lg:w-[31%] md:w-[31%] rounded-lg border border-[#E0BB83]/40  p-4 mt-6">
+                      <Link to={`/dashboard/explore/${index}`}>
+                        {/* {console.log(item?.interest_rate.toString())} */}
+                        <img src='https://z-p3-scontent.fiba1-2.fna.fbcdn.net/o1/v/t0/f1/m247/2850021285355695016_2501028907_22-06-2024-04-34-56.jpeg?_nc_ht=z-p3-scontent.fiba1-2.fna.fbcdn.net&_nc_cat=102&ccb=9-4&oh=00_AYC1Z9Nt9gCWm8sHZ_yH-6sZYlv-w5ySnuMEa1F81h25RQ&oe=66794051&_nc_sid=5b3566' alt="" 
+                        className="w-[100%] rounded-lg h-[200px] object-cover object-center mb-4" />
+                        <p>Amount: {ethers.formatUnits(item?.amount, 18)}</p>
+                        <p>Rate: {item?.interest_rate.toString()}<span>&#37;</span></p>
+                        <p>Repayment: <span>&#36;</span>{ethers.formatUnits(item?.total_repayment, 8)}</p>
+                        <p>Return date: <span>{(new Date(Number(item?.return_date) * 1000)).toLocaleString()}</span></p>
+                      </Link>
+                    </div>
+                  ))}    
+       
         </div>
       </section>
     </main>
+  ) : (
+    <ConnectWallet />
+  )}
+</div>
   )
 }
 

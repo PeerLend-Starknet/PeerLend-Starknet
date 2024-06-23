@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Box from '@mui/material/Box';
 import FormControl from '@mui/material/FormControl';
 import Select from '@mui/material/Select';
@@ -6,11 +6,13 @@ import Modal from '@mui/material/Modal';
 import InputLabel from '@mui/material/InputLabel';
 import MenuItem from '@mui/material/MenuItem';
 
+
 import { useAccount, useContract, useContractWrite } from '@starknet-react/core';
 
 import peerlendAbi from "../constants/peerlendAbi.json";
 import peerlend_address from '../constants';
 import tokenList from '../constants/tokenList';
+import { ethers } from 'ethers';
 
 const style = {
   position: 'absolute',
@@ -31,7 +33,7 @@ const CreateRequest = () => {
   const handleClose = () => setOpen(false);
 
   const [tokenAddress, setTokenAddress] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
+  const [amount, setAmount] = useState<string>('0');
   const [interest, setInterest] = useState<string>('');
   const [returnDate, setReturnDate] = useState("");
 
@@ -40,10 +42,11 @@ const CreateRequest = () => {
   const { contract } = useContract({ abi: peerlendAbi, address: peerlend_address });
 
   const calls = useMemo(() => {
+
     if (!contract || !address || !tokenAddress || !amount || !interest || !returnDate) return [];
 
     const _returnDate = new Date(returnDate).getTime() / 1000;
-    return contract.populateTransaction["create_request"]!(amount, interest, _returnDate, tokenAddress);
+    return contract.populateTransaction["create_request"]!(ethers.parseEther(amount || "0")  , interest, _returnDate, tokenAddress);
   }, [contract, tokenAddress, amount, interest, returnDate]);
 
   const { writeAsync } = useContractWrite({ calls });
@@ -59,9 +62,10 @@ const CreateRequest = () => {
           aria-describedby="modal-modal-description"
         >
           <Box sx={style}>
+            <p id="modal-modal-title" className="text-[#E0BB83] font-playfair font-bold text-[24px] text-red-700 text-center">Ensure Enough collateral has been added before requesting for loan.</p>
             <input
               value={amount}
-              onChange={(e) => { setAmount(e.target.value) }}
+              onChange={(e) => {setAmount(e.target.value) }}
               type="text" placeholder='Amount' className="rounded-lg w-[100%] p-4 bg-[#ffffff23] backdrop-blur-lg mb-4 outline-none" />
             <input
               value={interest}

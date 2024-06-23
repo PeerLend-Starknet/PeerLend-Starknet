@@ -10,6 +10,7 @@ import tokenList from "../constants/tokenList";
 import erc20Abi from "../constants/erc20Abi.json";
 import peerlendAbi from "../constants/peerlendAbi.json";
 import peerlend_address from '../constants';
+import { ethers } from "ethers";
 
 import { useAccount, useContract, useContractWrite } from '@starknet-react/core';
 import { cairo } from 'starknet';
@@ -33,7 +34,7 @@ const DepositCollateral = () => {
   const handleClose = () => setOpen(false);
 
   const [tokenAddress, setTokenAddress] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
+  const [amount, setAmount] = useState<string>('0');
 
   const { address } = useAccount();
 
@@ -41,10 +42,10 @@ const DepositCollateral = () => {
   const { contract: peerlendContract } = useContract({ abi: peerlendAbi, address: peerlend_address });
 
   const calls = useMemo(() => {
-    if (!address || !erc20Contract || !peerlendContract) return [];
+    if (!address || !erc20Contract || !peerlendContract || !amount ) return [];
     return [
-      erc20Contract.populateTransaction["approve"]!(peerlendContract.address, cairo.uint256(amount)),
-      peerlendContract.populateTransaction["deposit_collateral"]!(tokenAddress, cairo.uint256(amount))
+      erc20Contract.populateTransaction["approve"]!(peerlendContract.address, ethers.parseEther(amount)),
+      peerlendContract.populateTransaction["deposit_collateral"]!(tokenAddress, ethers.parseEther(amount))
     ];
 
   }, [tokenAddress, amount, address]);

@@ -8,6 +8,7 @@ import peerlend_address from '../../constants';
 import { useAccount } from '@starknet-react/core';
 import { Link } from 'react-router-dom';
 import useReadContract from '../../components/useReadContract';
+import { ethers } from 'ethers';
 
 type Result = Array<{
   request_id: bigint;
@@ -19,13 +20,6 @@ type Result = Array<{
 }>;
 
 const Portfolio = () => {
-  // const { data, isLoading } = useContractRead({
-  //   abi: peerlendAbi,
-  //   address: peerlend_address,
-  //   functionName: "get_all_requests",
-  //   args: []
-  // });
-
 
   const res = useReadContract(peerlendAbi, peerlend_address, "get_all_requests", []);
 
@@ -48,6 +42,12 @@ const Portfolio = () => {
   };
 
   const portfolioRes: Result | undefined = parseData(data);
+
+  const filteredPortfolioRes = portfolioRes?.filter(item => item.borrower === ethers.toBigInt(address || 0n));
+
+  console.log(ethers.toBigInt(address || 0n), "filteredPortfolioRes");
+
+
 
   return (
     <div>
@@ -109,15 +109,18 @@ const Portfolio = () => {
           <section>
             <h3 className='text-[20px] font-playfair font-[700] my-4 text-[#E0BB83]'>Request Management</h3>
             <div className="flex justify-between flex-wrap">
-              {isLoading ? <p>Loading...</p> : portfolioRes?.map((item, index) => (
+              {isLoading ? <p>Loading...</p> :
+                filteredPortfolioRes?.length === 0 ? (
+                  <p>No requests yet.</p>
+                ) :  filteredPortfolioRes?.map((item, index) => (
                     <div key={index} className="w-[100%] lg:w-[31%] md:w-[31%] rounded-lg border border-[#E0BB83]/40  p-4 mt-6">
                       <Link to={`/dashboard/portfolio/${index}`}>
                         {/* {console.log(item?.interest_rate.toString())} */}
                         <img src='https://z-p3-scontent.fiba1-2.fna.fbcdn.net/o1/v/t0/f1/m247/2850021285355695016_2501028907_22-06-2024-04-34-56.jpeg?_nc_ht=z-p3-scontent.fiba1-2.fna.fbcdn.net&_nc_cat=102&ccb=9-4&oh=00_AYC1Z9Nt9gCWm8sHZ_yH-6sZYlv-w5ySnuMEa1F81h25RQ&oe=66794051&_nc_sid=5b3566' alt="" 
                         className="w-[100%] rounded-lg h-[200px] object-cover object-center mb-4" />
-                        <p>Amount: {item?.amount.toString()}</p>
+                        <p>Amount: {ethers.formatUnits(item?.amount, 18)}</p>
                         <p>Rate: {item?.interest_rate.toString()}<span>&#37;</span></p>
-                        <p>Repayment: <span>&#36;</span>{item?.total_repayment.toString()}</p>
+                        <p>Repayment: <span>&#36;</span>{ethers.formatUnits(item?.total_repayment, 8)}</p>
                         <p>Return date: <span>{(new Date(Number(item?.return_date) * 1000)).toLocaleString()}</span></p>
                       </Link>
                     </div>
