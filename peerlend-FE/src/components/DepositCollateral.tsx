@@ -49,7 +49,7 @@ const DepositCollateral = () => {
 
   }, [tokenAddress, amount, address]);
 
-  const { data, writeAsync } = useContractWrite({ calls });
+  const { writeAsync } = useContractWrite({ calls });
 
   return (
     <div className="w-[100%]">
@@ -89,10 +89,7 @@ const DepositCollateral = () => {
             className="rounded-lg w-[100%] p-4 bg-[#ffffff23] backdrop-blur-lg mb-4 outline-none"
           />
           <button
-            onClick={() => {
-              console.log(data);
-              writeAsync();
-            }}
+            onClick={() => { writeAsync() }}
             className="bg-[#E0BB83] text-[#2a2a2a] font-playfair font-bold py-2 px-4 rounded-lg lg:text-[18px] md:text-[18px] text-[16px] w-[100%] my-4"
           >Deposit</button>
         </Box>
