@@ -1,0 +1,3 @@
+export const peerlend_address = "0x5d8431fa7c1118bb2785f628e4d6cb0d768ef8b8e86daee5607097be66988c8"
+
+export default peerlend_address;
