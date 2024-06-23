@@ -256,12 +256,11 @@ pub mod Peerlend {
             let new_balance = prev_balance + amount;
             self.collateral_deposited.write((caller, token), new_balance);
 
-            // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: token };
-            // assert(
-            //     ERC20ABIDispatcher { contract_address: token }
-            //         .transfer_from(caller, get_contract_address(), amount),
-            //     errors::TRANSFER_FAILED
-            // );
+            assert(
+                ERC20ABIDispatcher { contract_address: token }
+                    .transfer_from(caller, get_contract_address(), amount),
+                errors::TRANSFER_FAILED
+            );
             self.emit(CollateralDeposited { user: caller, token, amount });
         }
 
@@ -376,12 +375,11 @@ pub mod Peerlend {
 
             // transfer the loan amount to the borrower
             // TODO: fix the erc20 transfer_from call
-            // let erc20_dispatcher = ERC20ABIDispatcher { contract_address: request.loan_token };
-            // assert(
-            //     ERC20ABIDispatcher { contract_address: request.loan_token }
-            //         .transfer_from(caller, request.borrower, request.amount),
-            //     errors::TRANSFER_FAILED
-            // );
+            assert(
+                ERC20ABIDispatcher { contract_address: request.loan_token }
+                    .transfer_from(caller, request.borrower, request.amount),
+                errors::TRANSFER_FAILED
+            );
 
             self.emit(RequestServiced { request_id, lender: caller, amount: request.amount });
         }
@@ -545,11 +543,12 @@ pub mod Peerlend {
                         ..caller_info
                     }
                 );
-        // assert(
-        //     ERC20ABIDispatcher { contract_address: request.loan_token }
-        //         .transfer_from(caller, request.lender, amount),
-        //     errors::TRANSFER_FAILED
-        // );
+            //TODO: fix the erc20 transfer_from call
+            assert(
+                ERC20ABIDispatcher { contract_address: request.loan_token }
+                    .transfer_from(caller, request.lender, amount),
+                errors::TRANSFER_FAILED
+            );
         }
 
 
