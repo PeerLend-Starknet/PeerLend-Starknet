@@ -1,8 +1,11 @@
 import React from 'react';
-
+import { useParams } from 'react-router-dom';
+import MakeOffer from '../../components/MakeOffer';
+import ServiceRequest from '../../components/ServiceRequest';
 
 const PortfolioDetails = () => {
-    // const { id } = useParams();
+    const { id } = useParams();
+    console.log(id)
 
     return (
         <main>
@@ -14,10 +17,10 @@ const PortfolioDetails = () => {
                     <p>Rate: <span>&#37;</span></p>
                     <p>Repayment: </p>
                     <p>Return date: <span></span></p>
-                    <h2>Manage Requests</h2>
+                    <h2 className=''>Manage Requests</h2>
                     <div className='flex justify-between'>
-                        {/* <MakeOffer id={id} />
-                        <ServiceRequest id={id} /> */}
+                        <MakeOffer  />
+                        <ServiceRequest  />
                     </div>
                 </div>
             </div>
